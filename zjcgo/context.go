@@ -39,6 +39,7 @@ type Context struct {
 	fromCache             url.Values //提取 post url参数
 	DisallowUnknownFields bool       //是否开启参数校验功能
 	IsValidate            bool       //是否开启结构体检验功能(参数严格匹配)
+	StatusCode            int        //状态码
 }
 
 /*
@@ -404,6 +405,7 @@ func (c *Context) String(status int, format string, values ...any) error {
 
 func (c *Context) Render(statusCode int, r render.Render) error {
 	err := r.Render(c.W)
+	c.StatusCode = statusCode
 	if statusCode != http.StatusOK {
 		c.W.WriteHeader(statusCode)
 	}

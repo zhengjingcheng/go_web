@@ -24,6 +24,7 @@ func Log(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 func main() {
 	engine := zjcgo.New()     //起一个服务引擎
 	g := engine.Group("user") //将路由组的名字加进去
+	g.Use(zjcgo.Logging)
 	g.Use(func(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 		return func(ctx *zjcgo.Context) {
 			fmt.Println("pre handler")
