@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/zhengjingcheng/zjcgo"
+	zjcLog "github.com/zhengjingcheng/zjcgo/log"
 	"log"
 	"net/http"
 )
@@ -23,8 +24,8 @@ func Log(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 }
 func main() {
 	engine := zjcgo.New()     //起一个服务引擎
-	g := engine.Group("user") //将路由组的名字加进去
-	g.Use(zjcgo.Logging)
+	g := engine.Group("user") //将路由组的名字加进去，返回user路由组
+	g.Use(zjcgo.Logging)      //调用打印日志中间件(通用)
 	g.Use(func(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 		return func(ctx *zjcgo.Context) {
 			fmt.Println("pre handler")
@@ -35,20 +36,35 @@ func main() {
 	//路由处理函数
 	g.Get("/hello", func(ctx *zjcgo.Context) {
 		fmt.Println("handler")
-		fmt.Fprint(ctx.W, "欢迎来到郑金成的博客")
+		_, err := fmt.Fprint(ctx.W, "欢迎来到郑金成的博客")
+		if err != nil {
+			return
+		}
 	}, Log)
 	g.Post("/info", func(ctx *zjcgo.Context) {
-		fmt.Fprint(ctx.W, "pos欢迎来到郑金成的博客")
+		_, err := fmt.Fprint(ctx.W, "pos欢迎来到郑金成的博客")
+		if err != nil {
+			return
+		}
 	})
 	g.Any("/any", func(ctx *zjcgo.Context) {
-		fmt.Fprint(ctx.W, "any欢迎来到郑金成的博客")
+		_, err := fmt.Fprint(ctx.W, "any欢迎来到郑金成的博客")
+		if err != nil {
+			return
+		}
 	})
 	g.Get("/get/:id", func(ctx *zjcgo.Context) {
-		fmt.Fprintf(ctx.W, "%s /get/*/set user info path variable", "zjccom")
+		_, err := fmt.Fprintf(ctx.W, "%s /get/*/set user info path variable", "zjccom")
+		if err != nil {
+			return
+		}
 	})
 
 	g.Get("/html", func(ctx *zjcgo.Context) {
-		ctx.HTML(http.StatusOK, "<h1>zjc博客</h1>")
+		err := ctx.HTML(http.StatusOK, "<h1>zjc博客</h1>")
+		if err != nil {
+			return
+		}
 	})
 
 	engine.LoadTemplate("tpl/*.html")
@@ -92,7 +108,10 @@ func main() {
 		ctx.FileFromFS("text.xlsx", http.Dir("tpl"))
 	})
 	g.Get("/redirect", func(ctx *zjcgo.Context) {
-		ctx.Redirect(http.StatusFound, "/user/hello")
+		err := ctx.Redirect(http.StatusFound, "/user/hello")
+		if err != nil {
+			return
+		}
 	})
 	//参数模块测试
 	//测试提取任意普通参数
@@ -103,7 +122,10 @@ func main() {
 	//测试提取map参数
 	g.Get("/queryMap", func(ctx *zjcgo.Context) {
 		m, _ := ctx.GetQueryMap("user")
-		ctx.JSON(http.StatusOK, m)
+		err := ctx.JSON(http.StatusOK, m)
+		if err != nil {
+			return
+		}
 	})
 
 	//测试提交表单参数
@@ -114,29 +136,24 @@ func main() {
 	//测试提交map参数
 	g.Post("/add1", func(ctx *zjcgo.Context) {
 		name, _ := ctx.GetPostFormMap("user")
-		ctx.JSON(http.StatusOK, name)
+		err := ctx.JSON(http.StatusOK, name)
+		if err != nil {
+			return
+		}
 	})
 	//测试提取文件
 	g.Post("/add2", func(ctx *zjcgo.Context) {
 		name, _ := ctx.GetPostFormMap("user")
-		ctx.JSON(http.StatusOK, name)
-		//file, _ := ctx.FormFile("file")
-		//err := ctx.SaveUploadedFile(file, "./upload/"+file.Filename)
-		//if err != nil {
-		//	log.Println(err)
-		//}
-		//同一个名字提取多个文件
-		//form, err := ctx.MultipartForm()
-		//log.Println(err)
-		//fileMap := form.File
-		//headers := fileMap["file"]
-		//for _, file := range headers {
-		//	ctx.SaveUploadedFile(file, "./upload/"+file.Filename)
-		//}
-		//同一个名字提取多个文件
+		err := ctx.JSON(http.StatusOK, name)
+		if err != nil {
+			return
+		}
 		files := ctx.FormFiles("file")
 		for _, file := range files {
-			ctx.SaveUploadedFile(file, "./upload/"+file.Filename)
+			err := ctx.SaveUploadedFile(file, "./upload/"+file.Filename)
+			if err != nil {
+				return
+			}
 		}
 	})
 
@@ -149,7 +166,10 @@ func main() {
 		ctx.IsValidate = true
 		err := ctx.BindJson(&user)
 		if err == nil {
-			ctx.JSON(http.StatusOK, user)
+			err := ctx.JSON(http.StatusOK, user)
+			if err != nil {
+				return
+			}
 		} else {
 			log.Println(err)
 		}
@@ -161,10 +181,33 @@ func main() {
 		//user := User{}
 		err := ctx.BindXML(user)
 		if err == nil {
-			ctx.JSON(http.StatusOK, user)
+			err := ctx.JSON(http.StatusOK, user)
+			if err != nil {
+				return
+			}
 		} else {
 			log.Println(err)
 		}
+	})
+
+	logger := zjcLog.Default() //初始化
+	logger.Formatter = &zjcLog.JsonFormatter{}
+	logger.SetLogPath("./log")
+	defer logger.CloseWriter()
+	g.Post("/xmlParam1", func(ctx *zjcgo.Context) {
+		user := &User{}
+		_ = ctx.BindXML(user)
+
+		logger.WithFields(zjcLog.Fields{
+			"name":  "zjc",
+			"lover": "jcy",
+		}).Debug("我是debug日志")
+
+		logger.Info("我是info日志")
+
+		logger.Error("我是error日志")
+
+		ctx.JSON(http.StatusOK, user)
 	})
 	engine.Run()
 }

@@ -27,7 +27,7 @@ type router struct {
 	handlerMap         map[string]map[string]HandlerFunc      //处理路由的函数 k1路径 k2请求方法
 	middlewaresFuncMap map[string]map[string][]MiddlewareFunc //路由级别中间件（重要）
 	treeNode           *treeNode                              //匹配路由的前缀树
-	middlewares        []MiddlewareFunc                       //通用中间件
+	middlewares        []MiddlewareFunc                       //通用中间件（基本用不到）
 }
 
 //路由组结构
@@ -132,6 +132,7 @@ type Engine struct {
 
 //初始化
 func New() *Engine {
+	//初始化路由组
 	engine := &Engine{
 		routerGroup: routerGroup{},
 	}
@@ -188,12 +189,18 @@ func (e *Engine) httpRequestHandle(ctx *Context, w http.ResponseWriter, r *http.
 			}
 			//如果不匹配 405状态
 			w.WriteHeader(http.StatusMethodNotAllowed)
-			fmt.Fprintf(w, r.RequestURI+""+method+"NOT ALLOWED")
+			_, err := fmt.Fprintf(w, r.RequestURI+""+method+"NOT ALLOWED")
+			if err != nil {
+				return
+			}
 			return
 		}
 	}
 	w.WriteHeader(http.StatusNotFound)
-	fmt.Fprintf(w, r.RequestURI+""+method+"NOT FOUND")
+	_, err := fmt.Fprintf(w, r.RequestURI+""+method+"NOT FOUND")
+	if err != nil {
+		return
+	}
 }
 
 //实现serverhttp 则说明也可以作为一个handler
