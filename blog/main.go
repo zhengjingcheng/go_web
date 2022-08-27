@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"github.com/zhengjingcheng/zjcgo"
 	zjcLog "github.com/zhengjingcheng/zjcgo/log"
+	"github.com/zhengjingcheng/zjcgo/zjcpool"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 )
 
 type User struct {
@@ -205,6 +208,40 @@ func main() {
 		ctx.Logger.Error("我是error日志")
 
 		ctx.JSON(http.StatusOK, user)
+	})
+	p, _ := zjcpool.NewPool(1)
+	g.Post("/pool", func(ctx *zjcgo.Context) {
+		currentTime := time.Now().UnixMilli()
+		var wg sync.WaitGroup
+		wg.Add(5)
+		p.Submit(func() {
+			fmt.Println("11111")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		p.Submit(func() {
+			fmt.Println("2222")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		p.Submit(func() {
+			fmt.Println("33333")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		p.Submit(func() {
+			fmt.Println("4444")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		p.Submit(func() {
+			fmt.Println("5555")
+			time.Sleep(3 * time.Second)
+			wg.Done()
+		})
+		wg.Wait()
+		fmt.Printf("time:%v\n", time.Now().UnixMilli()-currentTime)
+		ctx.JSON(http.StatusOK, "success")
 	})
 	engine.Run()
 }
