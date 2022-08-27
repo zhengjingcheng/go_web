@@ -1,1 +1,33 @@
-{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}
+{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}{"lover":"jcy","msg":"我是debug日志","name":"zjc"}[33m [msgo] [0m [34m2022/08/23 - 13:28:07[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  name=zjc,lover=jcy 
+[33m [msgo] [0m [34m2022/08/23 - 13:30:05[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  name=zjc,lover=jcy 
+[33m [msgo] [0m [34m2022/08/23 - 13:30:47[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  name=zjc,lover=jcy 
+[33m [msgo] [0m [34m2022/08/23 - 13:31:18[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  name=zjc,lover=jcy 
+[33m [msgo] [0m [34m2022/08/23 - 13:31:30[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  name=zjc,lover=jcy 
+[33m [msgo] [0m [34m2022/08/23 - 13:31:56[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  name=zjc,lover=jcy 
+[33m [msgo] [0m [34m2022/08/23 - 13:41:13[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  lover=jcy,name=zjc 
+[33m [msgo] [0m [34m2022/08/23 - 13:41:58[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  lover=jcy,name=zjc 
+[33m [msgo] [0m [34m2022/08/23 - 13:42:07[0m | level= [34m DEBUG [0m 
+ msg "我是debug日志" [0m | fields:  name=zjc,lover=jcy 
+[msgo] 2022/08/23 - 14:36:42 | level=DEBUG
+ msg"我是debug日志" | fields:  lover=jcy,name=zjc 
+
+[msgo] 2022/08/23 - 14:37:13 | level=DEBUG
+ msg"我是debug日志" | fields:  name=zjc,lover=jcy 
+
+[msgo] 2022/08/23 - 14:37:38 | level=DEBUG
+ msg"我是debug日志" | fields:  name=zjc,lover=jcy 
+
+[msgo] 2022/08/23 - 14:37:47 | level=DEBUG
+ msg"我是debug日志" | fields:  name=zjc,lover=jcy 
+
+[msgo] 2022/08/23 - 14:54:41 | level=DEBUG
+ msg"我是debug日志" | fields:  name=zjc,lover=jcy 
+

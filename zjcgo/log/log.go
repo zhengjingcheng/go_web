@@ -113,6 +113,7 @@ func (l *Logger) WithFields(fields Fields) *Logger {
 		LoggerFields: fields, //相当于在原来的基础上增加了一个
 	}
 }
+
 func (l *Logger) Print(level LoggerLevel, msg any) {
 	if l.Level > level {
 		//级别不满足 不打印日志
@@ -120,21 +121,29 @@ func (l *Logger) Print(level LoggerLevel, msg any) {
 	}
 	param := &LoggingFormatterParam{
 		Level:        level,
-		LoggerFields: l.LoggerFields,
 		Msg:          msg,
+		LoggerFields: l.LoggerFields,
 	}
-	formatter := l.Formatter.Formatter(param)
-	//fmt.Println(msg)
+
 	for _, out := range l.Outs {
 		if out.Out == os.Stdout {
 			param.Color = true
-			formatter = l.Formatter.Formatter(param)
-			fmt.Fprintln(out.Out, formatter)
+			l.print(param, out)
 		}
 		if out.Level == -1 || out.Level == level {
-			fmt.Fprint(out.Out, formatter)
+			param.Color = false
+			l.print(param, out)
+			//
+			l.CheckFileSize(out)
 		}
+
 	}
+
+}
+
+func (l *Logger) print(param *LoggingFormatterParam, out LoggerWriter) {
+	formatter := l.Formatter.Formatter(param)
+	fmt.Fprintln(out.Out, formatter)
 }
 func (l *Logger) SetLogPath(logPath string) {
 	l.logPath = logPath
@@ -229,7 +238,7 @@ func (l *Logger) CloseWriter() {
 		}
 	}
 }
-func (l *Logger) CheckFileSize(out *LoggerWriter) {
+func (l *Logger) CheckFileSize(out LoggerWriter) {
 	osFile := out.Out.(*os.File)
 	if osFile != nil {
 		stat, err := osFile.Stat()

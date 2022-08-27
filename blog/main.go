@@ -23,9 +23,8 @@ func Log(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 	}
 }
 func main() {
-	engine := zjcgo.New()     //起一个服务引擎
+	engine := zjcgo.Default() //起一个服务引擎
 	g := engine.Group("user") //将路由组的名字加进去，返回user路由组
-	g.Use(zjcgo.Logging)      //调用打印日志中间件(通用)
 	g.Use(func(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 		return func(ctx *zjcgo.Context) {
 			fmt.Println("pre handler")
@@ -189,23 +188,21 @@ func main() {
 			log.Println(err)
 		}
 	})
-
-	logger := zjcLog.Default() //初始化
-	logger.Formatter = &zjcLog.JsonFormatter{}
-	logger.SetLogPath("./log")
-	defer logger.CloseWriter()
+	engine.Logger.Formatter = &zjcLog.TextFormatter{}
+	engine.Logger.SetLogPath("./log")
+	defer engine.Logger.CloseWriter()
 	g.Post("/xmlParam1", func(ctx *zjcgo.Context) {
 		user := &User{}
 		_ = ctx.BindXML(user)
 
-		logger.WithFields(zjcLog.Fields{
+		ctx.Logger.WithFields(zjcLog.Fields{
 			"name":  "zjc",
 			"lover": "jcy",
 		}).Debug("我是debug日志")
 
-		logger.Info("我是info日志")
+		ctx.Logger.Info("我是info日志")
 
-		logger.Error("我是error日志")
+		ctx.Logger.Error("我是error日志")
 
 		ctx.JSON(http.StatusOK, user)
 	})

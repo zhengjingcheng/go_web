@@ -1,1 +1,33 @@
-{"msg":"我是error日志"}{"msg":"我是error日志"}{"msg":"我是error日志"}{"msg":"我是error日志"}
+{"msg":"我是error日志"}{"msg":"我是error日志"}{"msg":"我是error日志"}{"msg":"我是error日志"}{"msg":"我是error日志"}{"msg":"我是error日志"}{"msg":"我是error日志"}[33m [msgo] [0m [34m2022/08/23 - 13:28:07[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[33m [msgo] [0m [34m2022/08/23 - 13:30:05[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[33m [msgo] [0m [34m2022/08/23 - 13:30:47[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[33m [msgo] [0m [34m2022/08/23 - 13:31:18[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[33m [msgo] [0m [34m2022/08/23 - 13:31:30[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[33m [msgo] [0m [34m2022/08/23 - 13:31:56[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[33m [msgo] [0m [34m2022/08/23 - 13:41:13[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[33m [msgo] [0m [34m2022/08/23 - 13:41:58[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[33m [msgo] [0m [34m2022/08/23 - 13:42:07[0m | level= [31m ERROR [0m [31m
+ Error Cause By: "我是error日志" [0m   
+[msgo] 2022/08/23 - 14:36:42 | level=ERROR
+ Error Cause By:"我是error日志"   
+
+[msgo] 2022/08/23 - 14:37:13 | level=ERROR
+ Error Cause By:"我是error日志"   
+
+[msgo] 2022/08/23 - 14:37:38 | level=ERROR
+ Error Cause By:"我是error日志"   
+
+[msgo] 2022/08/23 - 14:37:47 | level=ERROR
+ Error Cause By:"我是error日志"   
+
+[msgo] 2022/08/23 - 14:54:41 | level=ERROR
+ Error Cause By:"我是error日志"   
+

@@ -2,6 +2,7 @@ package zjcgo
 
 import (
 	"fmt"
+	zjcLog "github.com/zhengjingcheng/zjcgo/log"
 	"github.com/zhengjingcheng/zjcgo/render"
 	"html/template"
 	"log"
@@ -33,6 +34,7 @@ type router struct {
 //路由组结构
 type routerGroup struct {
 	groups []*router //由一个个路由组成
+	engine *Engine
 }
 
 //添加新路由
@@ -43,6 +45,7 @@ func (r *routerGroup) Group(name string) *router {
 		middlewaresFuncMap: make(map[string]map[string][]MiddlewareFunc, 0),
 		treeNode:           &treeNode{name: "/", child: make([]*treeNode, 0)},
 	}
+	g.Use(r.engine.middles...)
 	r.groups = append(r.groups, g)
 	return g
 }
@@ -122,12 +125,17 @@ func (r *router) Head(name string, handle HandlerFunc, middlewareFunc ...Middlew
 ··························································封装服务器引擎·················································
 */
 
+type ErrorHandler func(err error) (int, any)
+
 //路由服务引擎(封装一个路由组)
 type Engine struct {
-	routerGroup                   //路由组，必须品
-	funcMap     template.FuncMap  //加载模板的句柄函数
-	HTMLRender  render.HTMLRender //HTML渲染函数
-	pool        sync.Pool         //加载上下文切换内容
+	routerGroup                    //路由组，必须品
+	funcMap      template.FuncMap  //加载模板的句柄函数
+	HTMLRender   render.HTMLRender //HTML渲染函数
+	pool         sync.Pool         //加载上下文切换内容
+	Logger       *zjcLog.Logger
+	middles      []MiddlewareFunc
+	errorHandler ErrorHandler
 }
 
 //初始化
@@ -141,6 +149,16 @@ func New() *Engine {
 	}
 	return engine
 }
+
+func Default() *Engine {
+	//初始化路由组
+	engine := New()
+	engine.routerGroup.engine = engine
+	engine.Logger = zjcLog.Default()
+	engine.Use(Logging, Recovery) //调用打印日志中间件(通用)
+	return engine
+}
+
 func (e *Engine) allocateContext() any {
 	return &Context{engine: e}
 }
@@ -208,6 +226,7 @@ func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := e.pool.Get().(*Context)
 	ctx.W = w
 	ctx.R = r
+	ctx.Logger = e.Logger
 	e.httpRequestHandle(ctx, w, r)
 
 	e.pool.Put(ctx)
@@ -218,4 +237,12 @@ func (e *Engine) Run() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (e *Engine) Use(middles ...MiddlewareFunc) {
+	e.middles = middles
+}
+
+func (e *Engine) RegisterErrorHandler(err ErrorHandler) {
+	e.errorHandler = err
 }

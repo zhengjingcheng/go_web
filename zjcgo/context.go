@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/zhengjingcheng/zjcgo/binding"
+	zjcLog "github.com/zhengjingcheng/zjcgo/log"
 	"github.com/zhengjingcheng/zjcgo/render"
 	"io"
 	"log"
@@ -40,6 +41,7 @@ type Context struct {
 	DisallowUnknownFields bool       //是否开启参数校验功能
 	IsValidate            bool       //是否开启结构体检验功能(参数严格匹配)
 	StatusCode            int        //状态码
+	Logger                *zjcLog.Logger
 }
 
 /*
@@ -404,11 +406,9 @@ func (c *Context) String(status int, format string, values ...any) error {
 }
 
 func (c *Context) Render(statusCode int, r render.Render) error {
+	c.W.WriteHeader(statusCode)
 	err := r.Render(c.W)
 	c.StatusCode = statusCode
-	if statusCode != http.StatusOK {
-		c.W.WriteHeader(statusCode)
-	}
 	return err
 }
 
@@ -430,4 +430,21 @@ func (c *Context) SaveUploadedFile(file *multipart.FileHeader, dst string) error
 
 	_, err = io.Copy(out, src)
 	return err
+}
+
+func (c *Context) Fail(code int, msg string) {
+	c.String(code, msg)
+}
+func (c *Context) ErrorHandle(err error) {
+	code, data := c.engine.errorHandler(err)
+	c.JSON(code, data)
+}
+
+func (c *Context) HandlerWithError(code int, obj any, err error) {
+	if err != nil {
+		statusCode, data := c.engine.errorHandler(err)
+		c.JSON(statusCode, data)
+		return
+	}
+	c.JSON(code, obj)
 }
