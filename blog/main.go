@@ -209,24 +209,25 @@ func main() {
 
 		ctx.JSON(http.StatusOK, user)
 	})
-	p, _ := zjcpool.NewPool(1)
+
+	p, _ := zjcpool.NewPool(5)
 	g.Post("/pool", func(ctx *zjcgo.Context) {
 		currentTime := time.Now().UnixMilli()
 		var wg sync.WaitGroup
 		wg.Add(5)
 		p.Submit(func() {
 			fmt.Println("11111")
-			time.Sleep(3 * time.Second)
+			time.Sleep(1 * time.Second)
 			wg.Done()
 		})
 		p.Submit(func() {
 			fmt.Println("2222")
-			time.Sleep(3 * time.Second)
+			time.Sleep(1 * time.Second)
 			wg.Done()
 		})
 		p.Submit(func() {
 			fmt.Println("33333")
-			time.Sleep(3 * time.Second)
+			time.Sleep(1 * time.Second)
 			wg.Done()
 		})
 		p.Submit(func() {
