@@ -15,6 +15,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 /*
@@ -42,6 +43,13 @@ type Context struct {
 	IsValidate            bool       //是否开启结构体检验功能(参数严格匹配)
 	StatusCode            int        //状态码
 	Logger                *zjcLog.Logger
+	Keys                  map[string]any
+	mu                    sync.RWMutex
+	sameSite              http.SameSite
+}
+
+func (c *Context) SetSameSite(s http.SameSite) {
+	c.sameSite = s
 }
 
 /*
@@ -83,6 +91,25 @@ func (c *Context) QueryArray(key string) (values []string) {
 func (c *Context) GetQueryArray(key string) (values []string, ok bool) {
 	c.initQueryCache()
 	values, ok = c.queryCache[key]
+	return
+}
+
+/*
+	设置用户名和密码
+*/
+func (c *Context) Set(key string, value any) {
+	c.mu.Lock()
+	if c.Keys == nil {
+		c.Keys = make(map[string]any)
+	}
+	c.Keys[key] = value
+	c.mu.Unlock()
+}
+
+func (c *Context) Get(key string) (value any, exists bool) {
+	c.mu.RLock()
+	value, exists = c.Keys[key]
+	c.mu.RUnlock()
 	return
 }
 
@@ -447,4 +474,25 @@ func (c *Context) HandlerWithError(code int, obj any, err error) {
 		return
 	}
 	c.JSON(code, obj)
+}
+
+func (c *Context) SetCookie(name, value string, maxAge int, path, domain string, secure, httpOnly bool) {
+	if path == "" {
+		path = "/"
+	}
+	http.SetCookie(c.W, &http.Cookie{
+		Name:     name,
+		Value:    url.QueryEscape(value),
+		MaxAge:   maxAge,
+		Path:     path,
+		Domain:   domain,
+		SameSite: c.sameSite,
+		Secure:   secure,
+		HttpOnly: httpOnly,
+	})
+}
+
+func (c *Context) GetCookie(name string) string {
+	cookie, _ := c.R.Cookie(name)
+	return cookie.String()
 }

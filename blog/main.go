@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/zhengjingcheng/zjcgo"
 	zjcLog "github.com/zhengjingcheng/zjcgo/log"
+	"github.com/zhengjingcheng/zjcgo/token"
 	"github.com/zhengjingcheng/zjcgo/zjcpool"
 	"log"
 	"net/http"
@@ -27,7 +28,15 @@ func Log(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 }
 func main() {
 	engine := zjcgo.Default() //起一个服务引擎
+
+	auth := &zjcgo.Accounts{
+		Users: make(map[string]string),
+	}
+	auth.Users["zjc"] = "123456"
+	engine.Use(auth.BasicAuth)
+
 	g := engine.Group("user") //将路由组的名字加进去，返回user路由组
+
 	g.Use(func(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 		return func(ctx *zjcgo.Context) {
 			fmt.Println("pre handler")
@@ -243,6 +252,26 @@ func main() {
 		wg.Wait()
 		fmt.Printf("time:%v\n", time.Now().UnixMilli()-currentTime)
 		ctx.JSON(http.StatusOK, "success")
+	})
+
+	g.Get("/login", func(ctx *zjcgo.Context) {
+		jwt := &token.JwtHandler{}
+		jwt.Key = []byte("123456")
+		jwt.SendCookie = true
+		jwt.TimeOut = 10 * time.Minute
+		jwt.RefreshTimeOut = 20 * time.Minute
+		jwt.Authenticator = func(ctx *zjcgo.Context) (map[string]any, error) {
+			data := make(map[string]any)
+			data["userId"] = 1
+			return data, nil
+		}
+		token, err := jwt.LoginHandler(ctx)
+		if err != nil {
+			log.Println(err)
+			ctx.JSON(http.StatusOK, err.Error())
+			return
+		}
+		ctx.JSON(http.StatusOK, token)
 	})
 	engine.Run()
 }
