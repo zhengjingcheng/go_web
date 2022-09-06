@@ -2,6 +2,7 @@ package zjcgo
 
 import (
 	"fmt"
+	"github.com/zhengjingcheng/zjcgo/config"
 	zjcLog "github.com/zhengjingcheng/zjcgo/log"
 	"github.com/zhengjingcheng/zjcgo/render"
 	"html/template"
@@ -155,6 +156,10 @@ func Default() *Engine {
 	engine := New()
 	engine.routerGroup.engine = engine
 	engine.Logger = zjcLog.Default()
+	logPath, ok := config.Conf.Log["path"]
+	if ok {
+		engine.Logger.SetLogPath(logPath.(string))
+	}
 	engine.Use(Logging, Recovery) //调用打印日志中间件(通用)
 	return engine
 }

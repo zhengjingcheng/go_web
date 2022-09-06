@@ -3,6 +3,7 @@ package zjcpool
 import (
 	"errors"
 	"fmt"
+	"github.com/zhengjingcheng/zjcgo/config"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -44,6 +45,13 @@ type Pool struct {
 
 func NewPool(cap int32) (*Pool, error) {
 	return NewTimePool(cap, DefaultExpire)
+}
+func NewPoolConfig() (*Pool, error) {
+	cap, ok := config.Conf.Pool["cap"]
+	if !ok {
+		return nil, errors.New("cap config not exist")
+	}
+	return NewPool(cap.(int32))
 }
 func NewTimePool(cap int32, expire int) (*Pool, error) {
 	if cap <= 0 {
