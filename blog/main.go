@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/zhengjingcheng/zjcgo"
+	"github.com/zhengjingcheng/zjcgo/config"
 	zjcLog "github.com/zhengjingcheng/zjcgo/log"
 	"github.com/zhengjingcheng/zjcgo/token"
 	"github.com/zhengjingcheng/zjcgo/zjcpool"
@@ -27,6 +28,7 @@ func Log(next zjcgo.HandlerFunc) zjcgo.HandlerFunc {
 	}
 }
 func main() {
+	fmt.Println(config.Conf)
 	engine := zjcgo.Default() //起一个服务引擎
 
 	auth := &zjcgo.Accounts{
