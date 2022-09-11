@@ -59,10 +59,21 @@ func (db *ZjcDb) SetMaxIdleConns(n int) {
 	db.db.SetMaxIdleConns(5)
 }
 
-func (db *ZjcDb) New() *ZjcSeeion {
-	return &ZjcSeeion{
+func (db *ZjcDb) New(data any) *ZjcSeeion {
+	m := &ZjcSeeion{
 		db: db,
 	}
+	t := reflect.TypeOf(data)
+	//必须传递指针
+	if t.Kind() != reflect.Pointer {
+		panic(errors.New("data must be pointer"))
+	}
+	tVar := t.Elem()
+	if m.tableName == "" {
+		//如果没有表名，则给出一个默认的表名
+		m.tableName = m.db.Prefix + strings.ToLower(Name(tVar.Name()))
+	}
+	return m
 }
 func (s *ZjcSeeion) Table(name string) *ZjcSeeion {
 	s.tableName = name
@@ -158,6 +169,49 @@ func (s *ZjcSeeion) Update(data ...any) (int64, int64, error) {
 		s.updateParam.WriteString(data[0].(string))
 		s.updateParam.WriteString(" = ? ")
 		s.values = append(s.values, data[1])
+	} else {
+		updateData := data[0]
+		t := reflect.TypeOf(updateData)
+		v := reflect.ValueOf(updateData)
+		//必须传递指针
+		if t.Kind() != reflect.Pointer {
+			panic(errors.New("updateData must be pointer"))
+		}
+		tVar := t.Elem()
+		vVar := v.Elem()
+		if s.tableName == "" {
+			//如果没有表名，则给出一个默认的表名
+			s.tableName = s.db.Prefix + strings.ToLower(Name(tVar.Name()))
+		}
+		for i := 0; i < tVar.NumField(); i++ {
+			fieldName := tVar.Field(i).Name
+			tag := tVar.Field(i).Tag //把tag提取出来
+			sqlTag := tag.Get("zjcorm")
+			if sqlTag == "" {
+				//如果用户没给tag字节写个默认值
+				sqlTag = strings.ToLower(Name(fieldName)) //转成小写
+			} else {
+				if strings.Contains(sqlTag, "auto_increment") {
+					//自增长的主键id
+					continue
+				}
+				if strings.Contains(sqlTag, ",") {
+					//如果Tag里包含逗号，    id,name,则取出第一个tag
+					sqlTag = sqlTag[:strings.Index(sqlTag, ",")]
+				}
+				id := vVar.Field(i).Interface()
+				if sqlTag == "id" && IsAutoId(id) {
+					//如果是自增长的Id就不处理
+					continue
+				}
+			}
+			if s.updateParam.String() != "" {
+				s.updateParam.WriteString(",")
+			}
+			s.updateParam.WriteString(sqlTag)
+			s.updateParam.WriteString(" = ? ")
+			s.values = append(s.values, vVar.Field(i).Interface())
+		}
 	}
 	query := fmt.Sprintf("update %s set %s", s.tableName, s.updateParam.String())
 	var sb strings.Builder
@@ -188,12 +242,40 @@ func (s *ZjcSeeion) Where(field string, value any) *ZjcSeeion {
 	if s.whereParam.String() == "" {
 		s.whereParam.WriteString("where ")
 	} else {
-		s.whereParam.WriteString(", ")
+		s.whereParam.WriteString(" and ")
 	}
 	s.whereParam.WriteString(field)
 	s.whereParam.WriteString(" = ")
 	s.whereParam.WriteString(" ? ")
 	s.whereValues = append(s.whereValues, value)
+	return s
+}
+
+func (s *ZjcSeeion) Delete() (int64, error) {
+	//delete from table where id = ?
+	query := fmt.Sprintf("delete from %s ", s.tableName)
+	var sb strings.Builder
+	sb.WriteString(query)
+	sb.WriteString(s.whereParam.String())
+	s.db.logger.Info(sb.String())
+	stmt, err := s.db.db.Prepare(sb.String())
+	if err != nil {
+		return 0, err
+	}
+	r, err := stmt.Exec(s.whereValues...)
+	if err != nil {
+		return 0, err
+	}
+	return r.RowsAffected()
+}
+
+func (s *ZjcSeeion) And() *ZjcSeeion {
+	s.whereParam.WriteString(" and ")
+	return s
+}
+
+func (s *ZjcSeeion) Or() *ZjcSeeion {
+	s.whereParam.WriteString(" or ")
 	return s
 }
 func (s *ZjcSeeion) InsertBash(data []any) (int64, int64, error) {
@@ -271,6 +353,78 @@ func (s *ZjcSeeion) batchValues(data []any) {
 			s.values = append(s.values, vVar.Field(i).Interface())
 		}
 	}
+}
+
+/*
+	查询语句
+*/
+//select * from table where id =1000 难点：
+//查询一个
+func (s *ZjcSeeion) SelectOne(data any, fields ...string) error {
+	t := reflect.TypeOf(data)
+	if t.Kind() != reflect.Pointer {
+		return errors.New("data must be pointer")
+	}
+	fieldStr := "*"
+	if len(fields) > 0 {
+		fieldStr = strings.Join(fields, ",")
+	}
+	query := fmt.Sprintf("select %s from %s ", fieldStr, s.tableName)
+	var sb strings.Builder
+	sb.WriteString(query)
+	sb.WriteString(s.whereParam.String())
+	s.db.logger.Info(sb.String())
+
+	stmt, err := s.db.db.Prepare(sb.String())
+	if err != nil {
+		return err
+	}
+	rows, err := stmt.Query(s.whereValues...)
+	if err != nil {
+		return err
+	}
+	//id user_name age
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	values := make([]any, len(columns))
+	fieldScan := make([]any, len(columns))
+	for i := range fieldScan {
+		fieldScan[i] = &values[i]
+	}
+	if rows.Next() {
+		err := rows.Scan(fieldScan...)
+		if err != nil {
+			return err
+		}
+		tVar := t.Elem()
+		vVar := reflect.ValueOf(data).Elem()
+		for i := 0; i < tVar.NumField(); i++ {
+			name := tVar.Field(i).Name
+			tag := tVar.Field(i).Tag
+			//id,auto
+			sqlTag := tag.Get("zjcorm")
+			if sqlTag == "" {
+				sqlTag = strings.ToLower(Name(name))
+			} else {
+				if strings.Contains(sqlTag, ",") {
+					sqlTag = sqlTag[:strings.Index(sqlTag, ",")]
+				}
+			}
+			for j, colName := range columns {
+				if sqlTag == colName {
+					target := values[j]
+					targetValue := reflect.ValueOf(target)
+					fieldType := tVar.Field(i).Type
+					//这样不行 类型不匹配 转换类型
+					result := reflect.ValueOf(targetValue.Interface()).Convert(fieldType)
+					vVar.Field(i).Set(result)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func IsAutoId(id any) bool {

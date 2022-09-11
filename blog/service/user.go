@@ -26,7 +26,7 @@ func SaveUser() {
 		Password: "112321",
 		Age:      20,
 	}
-	id, _, err := db.New().Insert(user)
+	id, _, err := db.New(&User{}).Insert(user)
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +52,7 @@ func SaveUserBatch() {
 	}
 	var users []any
 	users = append(users, user1, user)
-	id, _, err := db.New().InsertBash(users)
+	id, _, err := db.New(&User{}).InsertBash(users)
 	if err != nil {
 		panic(err)
 	}
@@ -64,10 +64,29 @@ func UpdateUser() {
 	db := orm.Open("mysql", dataSourceName)
 	//可以给前缀
 	//db.Prefix = "zjcgo_"
-	id, _, err := db.New().Table("user").Where("id", 1000).Update("age", 12)
+	user := &User{
+		Username: "zjc",
+		Password: "5243",
+		Age:      23,
+	}
+	_, _, err := db.New(&User{}).Where("id", 1006).Update(user)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(id)
+
+	db.Close()
+}
+
+func SelectOne() {
+	dataSourceName := fmt.Sprintf("root:zjc19980924@tcp(localhost:3306)/zjcgo?charset=utf8&loc=%s&parseTime=true", url.QueryEscape("Asia/Shanghai"))
+	db := orm.Open("mysql", dataSourceName)
+	//可以给前缀
+	//db.Prefix = "zjcgo_"
+	user := &User{}
+	err := db.New(user).Where("id", 1006).And().Where("age", 23).SelectOne(user)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(user)
 	db.Close()
 }
