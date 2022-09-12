@@ -83,10 +83,40 @@ func SelectOne() {
 	//可以给前缀
 	//db.Prefix = "zjcgo_"
 	user := &User{}
-	err := db.New(user).Where("id", 1006).And().Where("age", 23).SelectOne(user)
+	err := db.New(user).Where("id", 1006).SelectOne(user, "id")
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println(user)
+	db.Close()
+}
+func Select() {
+	dataSourceName := fmt.Sprintf("root:zjc19980924@tcp(localhost:3306)/zjcgo?charset=utf8&loc=%s&parseTime=true", url.QueryEscape("Asia/Shanghai"))
+	db := orm.Open("mysql", dataSourceName)
+	//可以给前缀
+	//db.Prefix = "zjcgo_"
+	user := &User{}
+	users, err := db.New(user).Where("id", 1000).Order("id", "asc").Select(user)
+	if err != nil {
+		panic(err)
+	}
+	for _, v := range users {
+		u := v.(*User)
+		fmt.Println(u)
+	}
+	fmt.Println(users)
+	db.Close()
+}
+func Count() {
+	dataSourceName := fmt.Sprintf("root:zjc19980924@tcp(localhost:3306)/zjcgo?charset=utf8&loc=%s&parseTime=true", url.QueryEscape("Asia/Shanghai"))
+	db := orm.Open("mysql", dataSourceName)
+	//可以给前缀
+	//db.Prefix = "zjcgo_"
+	user := &User{}
+	count, err := db.New(user).Count()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(count)
 	db.Close()
 }

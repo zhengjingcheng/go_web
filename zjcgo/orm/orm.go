@@ -17,6 +17,8 @@ type ZjcDb struct {
 }
 type ZjcSeeion struct {
 	db          *ZjcDb
+	tx          *sql.Tx //事务
+	beginTx     bool    //是否开启事务
 	tableName   string
 	fieldName   []string
 	placeHolder []string
@@ -85,7 +87,13 @@ func (s *ZjcSeeion) Insert(data any) (int64, int64, error) {
 	s.fieldNames(data)
 	query := fmt.Sprintf("insert into %s (%s) values (%s)", s.tableName, strings.Join(s.fieldName, ","), strings.Join(s.placeHolder, ","))
 	s.db.logger.Info(query)
-	stmt, err := s.db.db.Prepare(query)
+	var stmt *sql.Stmt
+	var err error
+	if s.beginTx {
+		stmt, err = s.tx.Prepare(query)
+	} else {
+		stmt, err = s.db.db.Prepare(query)
+	}
 	if err != nil {
 		return -1, -1, err
 	}
@@ -101,6 +109,7 @@ func (s *ZjcSeeion) Insert(data any) (int64, int64, error) {
 	if err != nil {
 		return -1, -1, err
 	}
+	s.tx.Commit()
 	return id, affected, nil
 }
 func (s *ZjcSeeion) fieldNames(data any) {
@@ -179,10 +188,6 @@ func (s *ZjcSeeion) Update(data ...any) (int64, int64, error) {
 		}
 		tVar := t.Elem()
 		vVar := v.Elem()
-		if s.tableName == "" {
-			//如果没有表名，则给出一个默认的表名
-			s.tableName = s.db.Prefix + strings.ToLower(Name(tVar.Name()))
-		}
 		for i := 0; i < tVar.NumField(); i++ {
 			fieldName := tVar.Field(i).Name
 			tag := tVar.Field(i).Tag //把tag提取出来
@@ -237,6 +242,29 @@ func (s *ZjcSeeion) Update(data ...any) (int64, int64, error) {
 	}
 	return id, affected, nil
 }
+
+func (s *ZjcSeeion) Count() (int64, error) {
+	query := fmt.Sprintf("select count(*) from %s ", s.tableName)
+	var sb strings.Builder
+	sb.WriteString(query)
+	sb.WriteString(s.whereParam.String())
+	s.db.logger.Info(sb.String())
+	stmt, err := s.db.db.Prepare(sb.String())
+	if err != nil {
+		return 0, err
+	}
+	row := stmt.QueryRow(s.whereValues...)
+	if row.Err() != nil {
+		return 0, err
+	}
+	var result int64
+	err = row.Scan(&result)
+	if err != nil {
+		return 0, err
+	}
+	return result, nil
+}
+
 func (s *ZjcSeeion) Where(field string, value any) *ZjcSeeion {
 	//id = 1
 	if s.whereParam.String() == "" {
@@ -248,6 +276,55 @@ func (s *ZjcSeeion) Where(field string, value any) *ZjcSeeion {
 	s.whereParam.WriteString(" = ")
 	s.whereParam.WriteString(" ? ")
 	s.whereValues = append(s.whereValues, value)
+	return s
+}
+
+//其他查询条件
+func (s *ZjcSeeion) Like(field string, value any) *ZjcSeeion {
+	//name like %s%
+	if s.whereParam.String() == "" {
+		s.whereParam.WriteString("where ")
+	}
+	s.whereParam.WriteString(field)
+	s.whereParam.WriteString(" like ")
+	s.whereParam.WriteString(" ? ")
+	s.whereValues = append(s.whereValues, "%"+value.(string)+"%")
+	return s
+}
+func (s *ZjcSeeion) Group(field ...string) *ZjcSeeion {
+	//group by aa,bb
+	s.whereParam.WriteString(" group by ")
+	s.whereParam.WriteString(strings.Join(field, ","))
+	return s
+}
+func (s *ZjcSeeion) OrderDesc(field ...string) *ZjcSeeion {
+	//Order by aa,bb desc
+	s.whereParam.WriteString(" order by ")
+	s.whereParam.WriteString(strings.Join(field, ","))
+	s.whereParam.WriteString(" desc ")
+	return s
+}
+func (s *ZjcSeeion) OrderAsc(field ...string) *ZjcSeeion {
+	//Order by aa,bb asc
+	s.whereParam.WriteString(" order by ")
+	s.whereParam.WriteString(strings.Join(field, ","))
+	s.whereParam.WriteString(" asc ")
+	return s
+}
+
+//Order Order("aa","desc","bb","asc")
+func (s *ZjcSeeion) Order(field ...string) *ZjcSeeion {
+	//Order by aa desc,bb asc
+	if len(field)%2 != 0 {
+		panic("field num not true")
+	}
+	s.whereParam.WriteString(" order by ")
+	for index, v := range field {
+		s.whereParam.WriteString(v + " ")
+		if index%2 != 0 && index < len(field)-1 {
+			s.whereParam.WriteString(",")
+		}
+	}
 	return s
 }
 
@@ -356,6 +433,76 @@ func (s *ZjcSeeion) batchValues(data []any) {
 }
 
 /*
+	原生sql的支持
+*/
+func (s *ZjcSeeion) Exec(sql string, values ...any) (int64, error) {
+	stmt, err := s.db.db.Prepare(sql)
+	if err != nil {
+		return 0, err
+	}
+	r, err := stmt.Exec(values)
+	if err != nil {
+		return 0, err
+	}
+	if strings.Contains(strings.ToLower(sql), "insert") {
+		return r.LastInsertId()
+	}
+	return r.RowsAffected()
+}
+func (s *ZjcSeeion) QueryRow(sql string, data any, queryValues ...any) error {
+	t := reflect.TypeOf(data)
+	stmt, err := s.db.db.Prepare(sql)
+	if err != nil {
+		return err
+	}
+	rows, err := stmt.Query(queryValues...)
+	if err != nil {
+		return err
+	}
+	columns, err := rows.Columns()
+	if err != nil {
+		return err
+	}
+	values := make([]any, len(columns))
+	fieldScan := make([]any, len(columns))
+	for i := range fieldScan {
+		fieldScan[i] = &values[i]
+	}
+	if rows.Next() {
+		err := rows.Scan(fieldScan...)
+		if err != nil {
+			return err
+		}
+		tVar := t.Elem()
+		vVar := reflect.ValueOf(data).Elem()
+		for i := 0; i < tVar.NumField(); i++ {
+			name := tVar.Field(i).Name
+			tag := tVar.Field(i).Tag
+			//id,auto
+			sqlTag := tag.Get("zjcorm")
+			if sqlTag == "" {
+				sqlTag = strings.ToLower(Name(name))
+			} else {
+				if strings.Contains(sqlTag, ",") {
+					sqlTag = sqlTag[:strings.Index(sqlTag, ",")]
+				}
+			}
+			for j, colName := range columns {
+				if sqlTag == colName {
+					target := values[j]
+					targetValue := reflect.ValueOf(target)
+					fieldType := tVar.Field(i).Type
+					//这样不行 类型不匹配 转换类型
+					result := reflect.ValueOf(targetValue.Interface()).Convert(fieldType)
+					vVar.Field(i).Set(result)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+/*
 	查询语句
 */
 //select * from table where id =1000 难点：
@@ -427,6 +574,85 @@ func (s *ZjcSeeion) SelectOne(data any, fields ...string) error {
 	return nil
 }
 
+/*
+	查询多行
+*/
+func (s *ZjcSeeion) Select(data any, fields ...string) ([]any, error) {
+	t := reflect.TypeOf(data)
+	if t.Kind() != reflect.Pointer {
+		return nil, errors.New("data must be pointer")
+	}
+	fieldStr := "*"
+	if len(fields) > 0 {
+		fieldStr = strings.Join(fields, ",")
+	}
+	query := fmt.Sprintf("select %s from %s ", fieldStr, s.tableName)
+	var sb strings.Builder
+	sb.WriteString(query)
+	sb.WriteString(s.whereParam.String())
+	s.db.logger.Info(sb.String())
+
+	stmt, err := s.db.db.Prepare(sb.String())
+	if err != nil {
+		return nil, err
+	}
+	rows, err := stmt.Query(s.whereValues...)
+	if err != nil {
+		return nil, err
+	}
+	//id user_name age
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]any, 0)
+	for {
+		if rows.Next() {
+			//由于 传进来的是一个指针地址  如果每次赋值 实际都是一个 result里面值都一样
+			//每次查询的时候 data都换一个地址
+			data := reflect.New(t.Elem()).Interface()
+			values := make([]any, len(columns))
+			fieldScan := make([]any, len(columns))
+			for i := range fieldScan {
+				fieldScan[i] = &values[i]
+			}
+			err := rows.Scan(fieldScan...)
+			if err != nil {
+				return nil, err
+			}
+			tVar := t.Elem()
+			vVar := reflect.ValueOf(data).Elem()
+			for i := 0; i < tVar.NumField(); i++ {
+				name := tVar.Field(i).Name
+				tag := tVar.Field(i).Tag
+				//id,auto
+				sqlTag := tag.Get("zjcorm")
+				if sqlTag == "" {
+					sqlTag = strings.ToLower(Name(name))
+				} else {
+					if strings.Contains(sqlTag, ",") {
+						sqlTag = sqlTag[:strings.Index(sqlTag, ",")]
+					}
+				}
+				for j, colName := range columns {
+					if sqlTag == colName {
+						target := values[j]
+						targetValue := reflect.ValueOf(target)
+						fieldType := tVar.Field(i).Type
+						//这样不行 类型不匹配 转换类型
+						result := reflect.ValueOf(targetValue.Interface()).Convert(fieldType)
+						vVar.Field(i).Set(result)
+					}
+				}
+			}
+			result = append(result, data)
+		} else {
+			break
+		}
+	}
+	return result, nil
+}
+
 func IsAutoId(id any) bool {
 	t := reflect.TypeOf(id)
 	switch t.Kind() {
@@ -467,4 +693,33 @@ func Name(name string) string {
 	}
 	sb.WriteString(name[lastIndex:])
 	return sb.String()
+}
+
+/*
+   事务
+*/
+func (s *ZjcSeeion) Begin() error {
+	tx, err := s.db.db.Begin()
+	if err != nil {
+		return err
+	}
+	s.tx = tx
+	s.beginTx = true
+	return nil
+}
+func (s *ZjcSeeion) Commit() error {
+	err := s.tx.Commit()
+	if err != nil {
+		return err
+	}
+	s.beginTx = false
+	return nil
+}
+func (s *ZjcSeeion) Rollback() error {
+	err := s.tx.Rollback()
+	if err != nil {
+		return err
+	}
+	s.beginTx = false
+	return nil
 }
