@@ -10,12 +10,14 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 )
 
 type zjcHttpClient struct {
-	client http.Client
+	client     http.Client
+	serviceMap map[string]ZjcService
 }
 
 func NewHttpClient() *zjcHttpClient {
@@ -30,7 +32,7 @@ func NewHttpClient() *zjcHttpClient {
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}
-	return &zjcHttpClient{client: client}
+	return &zjcHttpClient{client: client, serviceMap: make(map[string]ZjcService)}
 }
 
 func (c *zjcHttpClient) Get(url string, args map[string]any) ([]byte, error) {
@@ -133,6 +135,97 @@ func (c *zjcHttpClient) toValues(args map[string]any) string {
 	}
 	return ""
 
+}
+
+type HttpConfig struct {
+	Host     string
+	Port     int
+	Protocol string //协议
+}
+
+const (
+	HTTP  = "http"
+	HTTPS = "https"
+)
+const (
+	GET      = "GET"
+	POSTForm = "POST_FORM"
+	POSTJson = "POST_JSON"
+)
+
+//返回
+type ZjcService interface {
+	Env() HttpConfig
+}
+
+func (c *zjcHttpClient) RegisterHttpService(name string, service ZjcService) {
+	c.serviceMap[name] = service
+}
+func (c *zjcHttpClient) Do(service string, method string) ZjcService {
+	zjcService, ok := c.serviceMap[service]
+	if !ok {
+		panic(errors.New("service not found"))
+	}
+	//找到service里面的Field给其中要调用的方法赋值
+	t := reflect.TypeOf(zjcService)
+	v := reflect.ValueOf(zjcService)
+	if t.Kind() != reflect.Pointer {
+		panic(errors.New("service not pointer"))
+	}
+	tVar := t.Elem()
+	vVar := v.Elem()
+	fieldIndex := -1
+	for i := 0; i < tVar.NumField(); i++ {
+		name := tVar.Field(i).Name
+		if name == method {
+			fieldIndex = i
+			break
+		}
+	}
+	if fieldIndex == -1 {
+		panic(errors.New("method not found"))
+	}
+	tag := tVar.Field(fieldIndex).Tag
+	rpcInfo := tag.Get("zjcrpc")
+	strings.Split(rpcInfo, ",")
+	if rpcInfo == "" {
+		panic(errors.New("not zjcrpc tag"))
+	}
+	split := strings.Split(rpcInfo, ",")
+	if len(split) != 2 {
+		panic(errors.New("tag zjcrpc not valid"))
+	}
+	methodType := split[0]
+	path := split[1]
+	httpConfig := zjcService.Env()
+
+	f := func(args map[string]any) ([]byte, error) {
+		if methodType == GET {
+			return c.Get(httpConfig.Prefix()+path, args)
+		}
+		if methodType == POSTForm {
+			return c.PostForm(httpConfig.Prefix()+path, args)
+		}
+		if methodType == POSTJson {
+			return c.PostJson(httpConfig.Prefix()+path, args)
+		}
+		return nil, errors.New("no match method type")
+	}
+	fValue := reflect.ValueOf(f)
+	vVar.Field(fieldIndex).Set(fValue)
+	return zjcService
+}
+func (c HttpConfig) Prefix() string {
+	if c.Protocol == "" {
+		c.Protocol = HTTP
+	}
+	switch c.Protocol {
+	case HTTP:
+		return fmt.Sprintf("http://%s:%d", c.Host, c.Port)
+	case HTTPS:
+		return fmt.Sprintf("https://%s:%d", c.Host, c.Port)
+	}
+	return ""
 }
 
 //func Get(){
